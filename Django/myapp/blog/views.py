@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.views import View
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from .models import Post, Comment, HashTag
 from .forms import PostForm, CommentForm, HashTagForm
 from django.urls import reverse_lazy, reverse
@@ -18,7 +19,7 @@ from django.urls import reverse_lazy, reverse
 class Index(View):
     def get(self, request):
         # return HttpResponse('Index page GET class')
-
+        
         # 데이터베이스에 접근해서 값을 가져와야 합니다.
         # 게시판에 글들을 보여줘야하기 때문에 데이터베이스에서 "값 조회"
         # MyModel.objects.all()
@@ -27,8 +28,8 @@ class Index(View):
         context = {
             "posts": post_objs
         }
-        # print(post_objs) QuerySet<[post 1, 2, 3, 4 ,5]>
-        return render(request, 'blog/board.html', context)
+        # print(post_objs) QuerySet<[post 1, 2, 3, 4, 5]>
+        return render(request, 'blog/post_list.html', context)
 
 
 # write
@@ -43,23 +44,45 @@ def write(request):
             return redirect('blog:list')
         
     form = PostForm()
-    return render(request, 'blog/write.html', { 'form': form })
+    return render(request, 'blog/post_form.html', { 'form': form })
 
 
 # Django 자체의 클래스 뷰 기능도 강력, 편리
 # model, template_name, context_objext_name,
 # paginate_by, form_class, form_valid(), get_queryset()
 # django.views.generic -> ListView
-class List(ListView):
-    model = Post # 모델
-    template_name = 'blog/post_list.html' # 템플릿
-    context_object_name = 'posts' # 변수 값의 이름
+# class List(ListView):
+#     model = Post # 모델
+#     template_name = 'blog/post_list.html' # 템플릿
+#     context_object_name = 'posts' # 변수 값의 이름
 
 
-class Write(CreateView):
-    model = Post # 모델
-    form_class = PostForm # 폼
-    success_url = reverse_lazy('blog:list') # 성공시 보내줄 url
+# class Write(CreateView):
+#     model = Post # 모델
+#     form_class = PostForm # 폼
+#     success_url = reverse_lazy('blog:list') # 성공시 보내줄 url
+
+class Write(LoginRequiredMixin, View):
+    # Mixin: LoginRequiredMixin
+    def get(self, request):
+        form = PostForm()
+        context = {
+            'form': form
+        }
+        return render(request, 'blog/post_form.html', context)
+    
+    def post(self, request):
+        form = PostForm(request.POST)
+        if form.is_valid():
+            post = form.save(commit=False) # commit=False 변수 할당만 우선 하고 이후에 수정가능
+            post.writer = request.user
+            post.save()
+            return redirect('blog:list')
+        form.add_error(None, '폼이 유효하지 않습니다.')
+        context = {
+            'form': form
+        }
+        return render(request, 'blog/post_form.html')
 
 
 class Detail(DetailView):
